@@ -3,6 +3,47 @@ This repos is developed based on the environment of:
 - Python 2.7
 - PyTorch 0.2
 
+However, now it is hard to build a environment meeting both.
+There is a workaround without installing python2, if you use `anaconda` or `miniconda`, you can create a virtual environment by 
+```
+conda create -n py2 python=2.7.
+```
+
+Then you can install the pytorch0.2 by 
+
+```
+conda install pytorch=0.2.0 cuda90 -c pytorch
+```
+Before that you should be aware of your cuda version if you want to use GPU.
+
+```
+nvcc --version
+```
+
+## (Update guideline) Follow the steps using script.
+After cloning the project, use `chmod +x file.sh` for each step to give them permission.
+
+`step0-start_envirionment.sh` 
+Build the environment.
+
+`step1-preproces.sh`
+Preprocess the raw data.
+
+`step2-prepare_training.sh`
+You should specify the DATA_DIR to the dataset (absolute).
+The number -1s are just placeholder.
+
+`step3-training.sh`
+Start training, you should specify the `--data_dir` (same as above).
+You'd better specify your log path in source code `run.py`.
+
+`step4-testing.sh`
+Start testing, you should specify the `--data_dir`.
+The number -1s are just placeholder.
+You'd better specify your log path in source code `run.py`
+
+After testing, the results are in the `dataset/result` folder.
+
 ## Data folder structure
 /media/BACKUP/ghproj_d/code_summarization/github-python/ is the folder to save all the data in this project, please replace it to your own folder.
 The data files are organized as follows in my computer:
@@ -52,6 +93,7 @@ python run.py train_a2c 10 30 10 hybrid 1 0
 ```
 python run.py test_a2c hybrid 1 0
 ```
+
 
 
 ## TODO
