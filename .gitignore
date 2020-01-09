@@ -1,0 +1,7 @@
+dataset/*
+.vscode/*
+log*
+*.pyc
+log.preprocess
+java-dataset/*
+.dockerignore

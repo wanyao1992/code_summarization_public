@@ -1,3 +1,4 @@
+# _*_ ecoding=utf8
 import subprocess
 import sys
 import fileinput
@@ -8,18 +9,28 @@ import util
 import glob
 import os
 import argparse
+import pandas as pd
 
-data_dir = "/media/BACKUP/ghproj_d/code_summarization/github-java/"
-repos = ["apache-ant-1.8.4", "apache-maven-3.0.4",  "MinorThird", "apache-cassandra-1.2.0", "batik-1.7", "xalan-j-2.7.1", "apache-log4j-1.2.17", "lucene-3.6.2", "xerces-2.11.0"] #
-original_path = data_dir + "original/"
-processed_path = data_dir + "processed/"
-train_path = data_dir + "train/"
+# data_dir = "/media/BACKUP/ghproj_d/code_summarization/github-java/"
+
+# repos = ["apache-ant-1.8.4", "apache-maven-3.0.4",  "MinorThird", "apache-cassandra-1.2.0", "batik-1.7", "xalan-j-2.7.1", "apache-log4j-1.2.17", "lucene-3.6.2", "xerces-2.11.0"] #
+# repos = ["gradle"]
 
 parser = argparse.ArgumentParser(description='java_process.py')
+parser.add_argument('--data_dir', type=str, default='java-dataset/')
 parser.add_argument('-train_portion', type=float, default=0.6)
 parser.add_argument('-dev_portion', type=float, default=0.2)
 
 opt = parser.parse_args()
+data_dir = opt.data_dir
+# original_path = data_dir + "original/"
+# processed_path = data_dir + "processed/"
+# train_path = data_dir + "train/"
+original_path = os.path.join(data_dir, "original/")
+processed_path = os.path.join(data_dir, "processed/")
+train_path = os.path.join(data_dir, "train/")
+
+
 
 def get_file_list(repo):
     command = """ls -R %s|grep .java | awk '
@@ -39,9 +50,13 @@ def clean_comment(comment):
     #     else:
     #         cleaned_comment.append(c)
     # return ''.join(cleaned_comment)
+    comment = comment.replace("/*", "")
+    comment = comment.replace("*/", "")
+
     comment = comment.lower()
     for c in ['<p>', '</p>', '<code>', '</code>', '<i>', '</i>', '<b>', '</b>', '<br>', '</br>']:
         comment = comment.replace(c, '')
+
 
     comment = comment.replace("this's", 'this is')
     comment = comment.replace("that's", 'that is')
@@ -51,19 +66,30 @@ def clean_comment(comment):
     comment = comment.replace('``', '')
     comment = comment.replace('`', '')
     comment = comment.replace('\'', '')
+    comment = comment.replace('->', '')
 
     removes = re.findall("(?<=[(])[^()]+[^()]+(?=[)])", comment)
     for r in removes:
         comment = comment.replace('('+r+')', '')
     # print "c: ", comment
     comment = comment.split('.')[0]
-    comment = comment.split('*')[0]
-    comment = comment.split('@')[0]
+    # comment = comment.split('*')[0]
+    # comment = comment.split('@')[0]
+    import string
+    for p in string.punctuation:
+        comment = comment.replace(p, ' ')
+    # comment = comment.replace('*', ' ')
+    # comment = comment.replace("@", ' ')
+    # comment = comment.replace("#", ' ')
+    # comment = comment.replace("}", ' ')
+    # comment = comment.replace("{", ' ')
+
     # print "comment: ", comment
     comment = comment.strip().strip('\n') + ' .'
+    comment = ' '.join(comment.split())
     return comment
 
-def generate_pairs(f_name, repo):
+def generate_pairs(f_name, repo=''):
     print(f_name)
 
     # file_lines = java_file.readlines()
@@ -78,6 +104,7 @@ def generate_pairs(f_name, repo):
 
     if len(comment_linenums) > 2:
         comment_linenums = comment_linenums[2:-1]
+    
 
     with open(processed_path + repo + '.code', 'a') as code_file:
         with open(processed_path + repo + '.comment', 'a') as comment_file:
@@ -92,6 +119,47 @@ def generate_pairs(f_name, repo):
                 if not comment.startswith('*') and len(comment.split()) > 2 and comment[0].isalpha():
                     code_file.write(code + '\n')
                     comment_file.write(comment + '\n')
+
+
+def generate_pairs_from_json(path):
+    # Data is from jdt parser
+    # 123,403 methods
+    train = pd.read_json(path, lines=True) 
+    data = train
+
+    all_comments = []
+    all_codes = []
+    all_method_name = []
+    for method_list in data['methods']:
+        comments = []
+        codes = []
+        for method in method_list:
+            # print(method)
+            all_method_name.append(method['method_name'])
+            comments.append(method['comment'])
+            codes.append(method['code'])
+        all_comments += comments
+        all_codes += codes
+    assert len(all_codes) == len(all_comments)
+
+    with open(processed_path + 'all.code', 'w') as code_file:
+        with open(processed_path + 'all.comment', 'w') as comment_file:
+            for code, comment in zip(all_codes, all_comments):
+                code = code.replace('\n', ' ')
+                comment = clean_comment(comment)
+                def ascii_issue(s):
+                    import string
+                    printable = set(string.printable)
+                    s = filter(lambda x: x in printable, s)
+                    return s
+                code = ascii_issue(code)
+                comment = ascii_issue(comment)
+                # code = str(code)
+                # comment = str(comment)
+                code_file.write(code + '\n')
+                comment_file.write(comment + '\n')
+    print("finished!")
+
 
 def split_dataset(train_portion, dev_portion):
     test_portion = 1 - train_portion - dev_portion
@@ -111,9 +179,9 @@ def split_dataset(train_portion, dev_portion):
 
     idx = 0
     with open(processed_path + "all.code", 'r') as all_file:
-        with open(train_path + "train%s%s%s.code" % (train_portion, dev_portion, test_portion), 'w') as train_file:
-            with open(train_path + "dev%s%s%s.code" % (train_portion, dev_portion, test_portion), 'w') as dev_file:
-                with open(train_path + "test%s%s%s.code" % (train_portion, dev_portion, test_portion), 'w') as test_file:
+        with open(train_path + "train%s%s%s.code" % (train_portion, dev_portion, test_portion), 'wb') as train_file:
+            with open(train_path + "dev%s%s%s.code" % (train_portion, dev_portion, test_portion), 'wb') as dev_file:
+                with open(train_path + "test%s%s%s.code" % (train_portion, dev_portion, test_portion), 'wb') as test_file:
                     for a_line in all_file.readlines():
                         if idx in train:
                             train_file.write(a_line)
@@ -153,23 +221,24 @@ if __name__ == '__main__':
     if os.listdir(processed_path):
         for f in os.listdir(processed_path):
             os.remove(processed_path + f)
-    for repo in repos:
-        print("repo:" , repo)
+    # for repo in repos:
+    #     print("repo:" , repo)
 
-        file_list = get_file_list(repo)
+    #     file_list = get_file_list(repo)
 
-        print("=========================")
-        print(file_list)
+    #     print("=========================")
+    #     print(file_list)
 
-        for f_name in file_list:
-            if f_name.endswith('.java'):
-                generate_pairs(f_name, repo)
+    #     for f_name in file_list:
+    #         if f_name.endswith('.java'):
+    #             generate_pairs(f_name, repo)
+    generate_pairs_from_json('/home/qiuyuanchen/OneDrive/Paper/CodeSum/data/interim/java-small-training.json')
 
     # concatenate multiple files into one file
-    command1 = "cat %s*code > %sall.code" % (processed_path, processed_path)
-    command2 = "cat %s*comment > %sall.comment" % (processed_path, processed_path)
-    subprocess.check_output([command1], shell=True)
-    subprocess.check_output([command2], shell=True)
+    # command1 = "cat %s*code > %sall.code" % (processed_path, processed_path)
+    # command2 = "cat %s*comment > %sall.comment" % (processed_path, processed_path)
+    # subprocess.check_output([command1], shell=True)
+    # subprocess.check_output([command2], shell=True)
 
     split_dataset(opt.train_portion, opt.dev_portion)
     # build_vocab(os.path.join(processed_path, 'all.code'), os.path.join(train_path, 'code_vocab.txt'))
