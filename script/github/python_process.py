@@ -8,15 +8,20 @@ import util
 import glob
 import argparse
 
-data_dir = "/media/BACKUP/ghproj_d/code_summarization/github-python/"
-original_path = data_dir + "original/"
-processed_path = data_dir + "processed/"
-train_path = data_dir + "train/"
+# data_dir = "/media/BACKUP/ghproj_d/code_summarization/github-python/"
+
 parser = argparse.ArgumentParser(description='python_process.py')
 parser.add_argument('-train_portion', type=float, default=0.6)
 parser.add_argument('-dev_portion', type=float, default=0.2)
+parser.add_argument('--data_dir', type=str, default='dataset/')
 
 opt = parser.parse_args()
+
+data_dir = opt.data_dir
+original_path = data_dir + "original/"
+processed_path = data_dir + "processed/"
+train_path = data_dir + "train/"
+
 
 def clean_code(declbody):
     # declbody = declbody.replace(' DCNL DCSP', '\n')
